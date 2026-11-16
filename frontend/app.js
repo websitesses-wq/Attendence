@@ -63,6 +63,7 @@ const courseSearchInput = document.getElementById('courseSearchInput');
 
 // Simulator Elements
 const simCourseSelect = document.getElementById('simCourseSelect');
+const simTargetPercent = document.getElementById('simTargetPercent');
 const simUpcomingHeld = document.getElementById('simUpcomingHeld');
 const simUpcomingAttended = document.getElementById('simUpcomingAttended');
 const simHeldVal = document.getElementById('simHeldVal');
@@ -153,15 +154,33 @@ function calcMetrics(attended, held, target) {
   }
 }
 
-// ── Live Target Change: Automatically recalculate without re-fetching ─────────
-targetPercentSelect.addEventListener('change', () => {
-  const newTarget = parseFloat(targetPercentSelect.value) || 85.0;
+// ── Unified Live Target Controller (Synchronizes Top & Simulator Selectors) ───
+function setTargetPercentage(val) {
+  const newTarget = parseFloat(val) || 85.0;
+  if (targetPercentSelect && targetPercentSelect.value !== String(newTarget)) {
+    targetPercentSelect.value = String(newTarget);
+  }
+  if (simTargetPercent && simTargetPercent.value !== String(newTarget)) {
+    simTargetPercent.value = String(newTarget);
+  }
   if (currentAttendanceData) {
     renderAttendanceData(currentAttendanceData, newTarget);
     alignAttendedToTarget();
     updateSimulator();
   }
-});
+}
+
+if (targetPercentSelect) {
+  targetPercentSelect.addEventListener('change', (e) => {
+    setTargetPercentage(e.target.value);
+  });
+}
+
+if (simTargetPercent) {
+  simTargetPercent.addEventListener('change', (e) => {
+    setTargetPercentage(e.target.value);
+  });
+}
 
 // Toggle Password Visibility
 togglePasswordBtn.addEventListener('click', () => {
@@ -522,7 +541,7 @@ courseSearchInput.addEventListener('input', (e) => {
 function alignAttendedToTarget() {
   if (!currentAttendanceData || !simUpcomingHeld || !simUpcomingAttended) return;
 
-  const target = parseFloat(targetPercentSelect.value) || 85.0;
+  const target = parseFloat(simTargetPercent?.value || targetPercentSelect?.value) || 85.0;
   const selVal = simCourseSelect.value;
   const upcomingHeld = parseInt(simUpcomingHeld.value) || 1;
 
@@ -560,6 +579,13 @@ function alignAttendedToTarget() {
 let simListenersAttached = false;
 
 function initSimulator(courses, summary, target) {
+  if (simTargetPercent && target) {
+    simTargetPercent.value = String(target);
+  }
+  if (targetPercentSelect && target) {
+    targetPercentSelect.value = String(target);
+  }
+
   simCourseSelect.innerHTML = '<option value="overall">Overall (All Subjects Combined)</option>';
   courses.forEach((c, idx) => {
     const opt = document.createElement('option');
@@ -599,7 +625,7 @@ function initSimulator(courses, summary, target) {
 function updateSimulator() {
   if (!currentAttendanceData) return;
 
-  const target = parseFloat(targetPercentSelect.value) || 85.0;
+  const target = parseFloat(simTargetPercent?.value || targetPercentSelect?.value) || 85.0;
   const selVal = simCourseSelect.value;
   const upcomingHeld = parseInt(simUpcomingHeld.value) || 1;
   

@@ -78,6 +78,19 @@
     body.dark #themeToggle .icon-moon { opacity: 0; transform: translate(-50%, -50%) rotate(-180deg) scale(0.4); }
     body.dark #themeToggle .icon-sun  { opacity: 1; transform: translate(-50%, -50%) rotate(0deg) scale(1); }
 
+    /* ── Permanent Fixed Taskbar (Never disappears on PC or Android) ── */
+    #mainHeader {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      width: 100% !important;
+      z-index: 9999 !important;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.35);
+    }
+
     /* ── DEV Credit Capsule (Medium Highlighted) ── */
     .dev-credit-nav {
       user-select: none;
@@ -108,10 +121,10 @@
     }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col pt-16 sm:pt-20">
 
-  <!-- ── Navigation Bar ── -->
-  <header class="bg-gradient-to-r from-slate-900 via-brand-900 to-indigo-950 text-white shadow-lg sticky top-0 z-50">
+  <!-- ── Navigation Bar (Fixed Top: Never Disappears on PC or Phone/Android) ── -->
+  <header id="mainHeader" class="bg-gradient-to-r from-slate-900/95 via-brand-900/95 to-indigo-950/95 text-white shadow-lg fixed top-0 left-0 right-0 w-full z-50">
     <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3.5 flex items-center justify-between gap-2">
 
       <!-- Left: Logo & Title -->
@@ -131,8 +144,14 @@
         </div>
       </div>
 
-      <!-- Right: Target link (Desktop) + DEV Credit Tag + Theme Toggle -->
-      <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+      <!-- Right: DEV Credit Tag + Target link (Desktop) + Theme Toggle -->
+      <div class="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
+        <!-- DEV Credit Capsule Tag (Medium Highlighted: instantly noticed, elegant) -->
+        <div class="dev-credit-nav flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500/20 border border-indigo-400/35 shadow-sm" title="Developer: V SUSSHANTH">
+          <span class="text-[9.5px] sm:text-[10px] font-semibold text-slate-300 uppercase tracking-wider">DEV:</span>
+          <span class="dev-name font-extrabold text-[11px] sm:text-[12px] tracking-wide">V SUSSHANTH</span>
+        </div>
+
         <!-- Target Link (Shown on Desktop, clean on mobile) -->
         <a href="https://zudent.rovelabs.com/login" target="_blank" rel="noreferrer"
            class="hidden md:flex text-xs text-slate-300 hover:text-white items-center gap-1 transition px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10"
@@ -140,12 +159,6 @@
           <span>Target: zudent.rovelabs.com</span>
           <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
         </a>
-
-        <!-- DEV Credit Capsule Tag (Medium Highlighted: instantly noticed, elegant) -->
-        <div class="dev-credit-nav flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500/20 border border-indigo-400/35 shadow-sm" title="Developer: V SUSSHANTH">
-          <span class="text-[9.5px] sm:text-[10px] font-semibold text-slate-300 uppercase tracking-wider">DEV:</span>
-          <span class="dev-name font-extrabold text-[11px] sm:text-[12px] tracking-wide">V SUSSHANTH</span>
-        </div>
 
         <!-- Theme Toggle Button -->
         <button id="themeToggle"
@@ -479,13 +492,32 @@
 
       <!-- What-If Attendance Simulator -->
       <section class="glass-card rounded-2xl p-3.5 sm:p-6 border border-slate-200/80 shadow-sm no-print">
-        <div class="flex items-center gap-2 mb-3.5">
-          <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center text-sm sm:text-base font-bold flex-shrink-0">
-            <i class="fa-solid fa-calculator"></i>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3.5 pb-2.5 border-b border-slate-200/70 dark:border-slate-800">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 flex items-center justify-center text-sm sm:text-base font-bold flex-shrink-0">
+              <i class="fa-solid fa-calculator"></i>
+            </div>
+            <div>
+              <h3 class="text-sm sm:text-lg font-bold text-slate-900">Interactive "What-If" Simulator</h3>
+              <p class="text-[10px] sm:text-xs text-slate-500">Simulate how attending upcoming classes impacts your final percentage.</p>
+            </div>
           </div>
-          <div>
-            <h3 class="text-sm sm:text-lg font-bold text-slate-900">Interactive "What-If" Simulator</h3>
-            <p class="text-[10px] sm:text-xs text-slate-500">Simulate how attending upcoming classes impacts your final percentage.</p>
+
+          <!-- Target % selector in Simulator (Synced with Top Target %) -->
+          <div class="flex items-center gap-1.5 self-start sm:self-auto bg-slate-100/90 dark:bg-slate-800/90 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+            <label for="simTargetPercent" class="text-[11px] sm:text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1">
+              <i class="fa-solid fa-bullseye text-blue-500"></i>
+              <span>Target %:</span>
+            </label>
+            <select id="simTargetPercent" class="px-2 py-0.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs font-bold text-blue-600 dark:text-blue-400 outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer">
+              <option value="60">60%</option>
+              <option value="65">65%</option>
+              <option value="70">70%</option>
+              <option value="75">75%</option>
+              <option value="80">80%</option>
+              <option value="85" selected>85%</option>
+              <option value="90">90%</option>
+            </select>
           </div>
         </div>
 
@@ -557,6 +589,6 @@
   </footer>
 
   <!-- Application Script (Cache Busted to ensure instant update on all phones) -->
-  <script src="/app.js?v=2.6"></script>
+  <script src="/app.js?v=2.8"></script>
 </body>
 </html>
