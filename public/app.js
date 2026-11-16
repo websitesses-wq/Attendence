@@ -3,6 +3,20 @@
 let currentAttendanceData = null;
 let statusInterval = null;
 
+// ── Dark Mode Toggle ──────────────────────────────────────────────────────────
+(function initDarkMode() {
+  const toggle = document.getElementById('themeToggle');
+  const body   = document.body;
+
+  // Restore saved preference
+  if (localStorage.getItem('theme') === 'dark') body.classList.add('dark');
+
+  toggle.addEventListener('click', () => {
+    body.classList.toggle('dark');
+    localStorage.setItem('theme', body.classList.contains('dark') ? 'dark' : 'light');
+  });
+})();
+
 // DOM Elements
 const form = document.getElementById('attendanceForm');
 const emailInput = document.getElementById('studentEmail');
