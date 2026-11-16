@@ -45,7 +45,7 @@
       .print-shadow-none { box-shadow: none !important; border: 1px solid #ddd !important; }
     }
 
-    /* â”€â”€ Dark Mode â”€â”€ */
+    /* ── Dark Mode ── */
     body.dark { background-color: #0f1117; color: #e2e8f0; }
     body.dark .glass-card {
       background: rgba(22, 27, 42, 0.97);
@@ -72,7 +72,7 @@
     body.dark .bg-blue-50 { background-color: rgba(29,78,216,0.12) !important; }
     body.dark .bg-red-50  { background-color: rgba(220,38,38,0.1) !important; }
 
-    /* â”€â”€ Theme Toggle Button â”€â”€ */
+    /* ── Theme Toggle Button ── */
     #themeToggle {
       position: relative;
       overflow: hidden;
@@ -90,27 +90,33 @@
     body.dark #themeToggle .icon-moon { opacity: 0; transform: translate(-50%, -50%) rotate(-180deg) scale(0.4); }
     body.dark #themeToggle .icon-sun  { opacity: 1; transform: translate(-50%, -50%) rotate(0deg) scale(1); }
 
-    /* â”€â”€ DEV credit â”€â”€ */
-    .dev-credit {
-      font-size: 11px;
+    /* ── DEV credit (navbar) ── */
+    .dev-credit-nav {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 10px;
       font-weight: 500;
-      letter-spacing: 0.08em;
-      color: rgba(148, 163, 184, 0.65);
-      transition: color 0.3s;
+      letter-spacing: 0.05em;
+      color: rgba(148, 163, 184, 0.50);
+      white-space: nowrap;
+      user-select: none;
+      margin-right: 2px;
     }
-    .dev-credit:hover { color: rgba(148, 163, 184, 0.9); }
-    .dev-credit span {
-      background: linear-gradient(90deg, #6366f1 0%, #818cf8 50%, #6366f1 100%);
-      background-size: 200% auto;
+    .dev-credit-nav .dev-name {
+      font-weight: 700;
+      font-size: 10.5px;
+      letter-spacing: 0.12em;
+      background: linear-gradient(90deg, #a5b4fc 0%, #e0e7ff 42%, #818cf8 72%, #a5b4fc 100%);
+      background-size: 220% auto;
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      animation: shimmer 4s linear infinite;
-      font-weight: 600;
+      animation: dev-shimmer 5.5s linear infinite;
     }
-    @keyframes shimmer {
+    @keyframes dev-shimmer {
       0%   { background-position: 0% center; }
-      100% { background-position: 200% center; }
+      100% { background-position: 220% center; }
     }
   </style>
 </head>
@@ -137,6 +143,7 @@
           <span>Target: zudent.rovelabs.com</span>
           <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
         </a>
+        <span class="dev-credit-nav mr-1">DEV&nbsp;:&nbsp;<span class="dev-name">V&nbsp;SUSSHANTH</span></span>
         <button id="themeToggle" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-slate-200 transition" title="Toggle dark mode">
           <i class="fa-solid fa-moon icon-moon text-sm"></i>
           <i class="fa-solid fa-sun icon-sun text-sm text-yellow-300"></i>
@@ -508,7 +515,6 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-slate-500">
       <p>Zudent Attendance Analyzer &bull; Built with FastAPI, Playwright & AWS AppSync Integration</p>
       <p class="mt-1 text-[11px] text-slate-400">Not affiliated with Rove Labs &bull; For personal academic attendance auditing & percentage verification</p>
-          <p class="mt-2 dev-credit">DEV : <span>V SUSSHANTH</span></p>
     </div>
   </footer>
 
