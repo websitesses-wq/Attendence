@@ -393,14 +393,14 @@ class ZudentClient:
         t85 = eval_target(85.0)
         t_custom = eval_target(custom_target)
 
-        if curr_pct >= 85.0:
+        if curr_pct >= custom_target:
             status = "Healthy"
             status_color = "emerald"
-        elif curr_pct >= 75.0:
+        elif curr_pct >= max(0.0, custom_target - 10.0):
             status = "Moderate"
             status_color = "amber"
         else:
-            status = "Critical (Below 75%)"
+            status = f"Critical (Below {int(max(0.0, custom_target - 10.0))}%)"
             status_color = "rose"
 
         return {

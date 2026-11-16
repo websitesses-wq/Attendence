@@ -70,8 +70,15 @@ def calc_metrics(attended: int, held: int, custom_target: float = 75.0) -> Dict[
             return {"target_percent": tp, "achieved": False, "bunks_allowed": 0, "classes_needed": max(1, need),
                     "message": f"Attend {max(1, need)} consecutive class(es) to reach {tp}%."}
 
-    status = "Healthy" if curr >= 85 else ("Moderate" if curr >= 75 else "Critical (Below 75%)")
-    color = "emerald" if curr >= 85 else ("amber" if curr >= 75 else "rose")
+    if curr >= custom_target:
+        status = "Healthy"
+        color = "emerald"
+    elif curr >= max(0.0, custom_target - 10.0):
+        status = "Moderate"
+        color = "amber"
+    else:
+        status = f"Critical (Below {int(max(0.0, custom_target - 10.0))}%)"
+        color = "rose"
     return {"status": status, "status_color": color,
             "targets": {"75": eval_t(75.0), "85": eval_t(85.0), "custom": {**eval_t(custom_target), "target": custom_target}}}
 

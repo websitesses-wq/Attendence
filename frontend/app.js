@@ -73,6 +73,42 @@ const simChangePct = document.getElementById('simChangePct');
 const simStatusPill = document.getElementById('simStatusPill');
 const simAdviceText = document.getElementById('simAdviceText');
 
+// ── Unified Dynamic Status Resolver (Changes with Selected Target %) ──────────
+function getAttendanceStatus(percentage, target) {
+  if (percentage >= target) {
+    return {
+      label: `Healthy (≥${target}%)`,
+      shortLabel: "Healthy",
+      color: "emerald",
+      badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-200",
+      textClass: "text-emerald-600",
+      barClass: "bg-emerald-500",
+      pillClass: "bg-emerald-500/20 text-emerald-300 border-emerald-400/30"
+    };
+  }
+  const warnThreshold = Math.max(0, target - 10);
+  if (percentage >= warnThreshold) {
+    return {
+      label: `Moderate (<${target}%)`,
+      shortLabel: "Moderate",
+      color: "amber",
+      badgeClass: "bg-amber-100 text-amber-800 border-amber-200",
+      textClass: "text-amber-600",
+      barClass: "bg-amber-500",
+      pillClass: "bg-amber-500/20 text-amber-300 border-amber-400/30"
+    };
+  }
+  return {
+    label: `Critical (<${warnThreshold}%)`,
+    shortLabel: "Critical",
+    color: "rose",
+    badgeClass: "bg-rose-100 text-rose-800 border-rose-200",
+    textClass: "text-rose-600",
+    barClass: "bg-rose-500",
+    pillClass: "bg-rose-500/20 text-rose-300 border-rose-400/30"
+  };
+}
+
 // ── Mathematical Metric Calculation (Client-Side Instant Engine) ──────────────
 function calcMetrics(attended, held, target) {
   if (held === 0) {
@@ -89,12 +125,13 @@ function calcMetrics(attended, held, target) {
 
   const curr = (attended / held) * 100;
   const t = target / 100.0;
+  const statusInfo = getAttendanceStatus(curr, target);
 
   if (curr >= target) {
     const bunks = t > 0 ? Math.max(0, Math.floor((attended - t * held) / t)) : 0;
     return {
-      status: curr >= 85 ? "Healthy" : "Moderate",
-      status_color: curr >= 85 ? "emerald" : "amber",
+      status: statusInfo.shortLabel,
+      status_color: statusInfo.color,
       target_percent: target,
       achieved: true,
       bunks_allowed: bunks,
@@ -105,8 +142,8 @@ function calcMetrics(attended, held, target) {
     const need = t < 1.0 ? Math.ceil(((t * held) - attended) / (1.0 - t)) : 9999;
     const classesNeeded = Math.max(1, need);
     return {
-      status: "Critical",
-      status_color: "rose",
+      status: statusInfo.shortLabel,
+      status_color: statusInfo.color,
       target_percent: target,
       achieved: false,
       bunks_allowed: 0,
@@ -259,21 +296,11 @@ function renderAttendanceData(data, target) {
   overallProgressBar.style.width = `${Math.min(100, overallPct)}%`;
   overallFractionText.textContent = `Attended ${totalAtt} of ${totalHeld} classes`;
 
-  // Status Badge for Overall
-  overallStatusBadge.className = 'px-2 py-0.5 text-[10px] sm:text-xs font-bold rounded-full';
-  if (overallPct >= 85) {
-    overallStatusBadge.classList.add('bg-emerald-100', 'text-emerald-800');
-    overallStatusBadge.textContent = 'Healthy (≥85%)';
-    overallProgressBar.className = 'h-1.5 rounded-full bg-emerald-500 transition-all duration-500';
-  } else if (overallPct >= 75) {
-    overallStatusBadge.classList.add('bg-amber-100', 'text-amber-800');
-    overallStatusBadge.textContent = 'Moderate (75-84%)';
-    overallProgressBar.className = 'h-1.5 rounded-full bg-amber-500 transition-all duration-500';
-  } else {
-    overallStatusBadge.classList.add('bg-rose-100', 'text-rose-800');
-    overallStatusBadge.textContent = 'Critical (<75%)';
-    overallProgressBar.className = 'h-1.5 rounded-full bg-rose-500 transition-all duration-500';
-  }
+  // Status Badge for Overall (Dynamically Evaluated Against Chosen Target)
+  const overallStatus = getAttendanceStatus(overallPct, target);
+  overallStatusBadge.className = `px-2 py-0.5 text-[10px] sm:text-xs font-bold rounded-full ${overallStatus.badgeClass}`;
+  overallStatusBadge.textContent = overallStatus.label;
+  overallProgressBar.className = `h-1.5 rounded-full ${overallStatus.barClass} transition-all duration-500`;
 
   // Classes Numbers
   totalAttendedCount.textContent = totalAtt;
@@ -322,23 +349,10 @@ function renderCoursesTable(courses, target) {
     const pct = c.exact_percentage ?? 0.0;
     const targetInfo = calcMetrics(c.classes_attended || 0, c.classes_held || 0, target);
 
-    let statusBadge = '';
-    let pctColor = 'text-slate-900';
-    let progressBg = 'bg-slate-200';
-
-    if (pct >= 85) {
-      statusBadge = `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">Healthy</span>`;
-      pctColor = 'text-emerald-600';
-      progressBg = 'bg-emerald-500';
-    } else if (pct >= 75) {
-      statusBadge = `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">Moderate</span>`;
-      pctColor = 'text-amber-600';
-      progressBg = 'bg-amber-500';
-    } else {
-      statusBadge = `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 border border-rose-200">Critical</span>`;
-      pctColor = 'text-rose-600';
-      progressBg = 'bg-rose-500';
-    }
+    const statusInfo = getAttendanceStatus(pct, target);
+    const statusBadge = `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusInfo.badgeClass} border">${statusInfo.shortLabel}</span>`;
+    const pctColor = statusInfo.textClass;
+    const progressBg = statusInfo.barClass;
 
     let adviceHtml = '';
     if (c.classes_held === 0) {
@@ -411,23 +425,10 @@ function renderMobileCards(courses, target) {
     const pct = c.exact_percentage ?? 0.0;
     const targetInfo = calcMetrics(c.classes_attended || 0, c.classes_held || 0, target);
 
-    let statusBadge = '';
-    let pctColor = 'text-slate-900';
-    let progressBg = 'bg-slate-200';
-
-    if (pct >= 85) {
-      statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">Healthy</span>`;
-      pctColor = 'text-emerald-600';
-      progressBg = 'bg-emerald-500';
-    } else if (pct >= 75) {
-      statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">Moderate</span>`;
-      pctColor = 'text-amber-600';
-      progressBg = 'bg-amber-500';
-    } else {
-      statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-100 text-rose-800 border border-rose-200">Critical</span>`;
-      pctColor = 'text-rose-600';
-      progressBg = 'bg-rose-500';
-    }
+    const statusInfo = getAttendanceStatus(pct, target);
+    const statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusInfo.badgeClass} border">${statusInfo.shortLabel}</span>`;
+    const pctColor = statusInfo.textClass;
+    const progressBg = statusInfo.barClass;
 
     let adviceHtml = '';
     if (c.classes_held === 0) {
@@ -569,16 +570,9 @@ function updateSimulator() {
   simChangePct.textContent = `${diff >= 0 ? '+' : ''}${diff.toFixed(2)}%`;
   simChangePct.className = diff >= 0 ? 'text-lg sm:text-2xl font-bold text-emerald-400' : 'text-lg sm:text-2xl font-bold text-rose-400';
 
-  if (newPct >= 85) {
-    simStatusPill.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30';
-    simStatusPill.textContent = 'Healthy (≥85%)';
-  } else if (newPct >= 75) {
-    simStatusPill.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30';
-    simStatusPill.textContent = 'Moderate (75-84%)';
-  } else {
-    simStatusPill.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-400/30';
-    simStatusPill.textContent = 'Critical (<75%)';
-  }
+  const simStatus = getAttendanceStatus(newPct, target);
+  simStatusPill.className = `px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${simStatus.pillClass}`;
+  simStatusPill.textContent = simStatus.label;
 
   const courseLabel = selVal === 'overall' ? 'overall attendance' : 'attendance for this course';
   if (newPct >= target) {
