@@ -209,7 +209,7 @@ async def fetch_attendance(email: str, password: str, target: float = 75.0) -> D
 # ---------------------------------------------------------------------------
 # FASTAPI APP
 # ---------------------------------------------------------------------------
-app = FastAPI(title="Zudent Attendance Analyzer", version="1.0.0")
+app = FastAPI(title="Qudent Attendance Analyzer", version="1.0.0")
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
                    allow_methods=["*"], allow_headers=["*"])

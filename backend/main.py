@@ -13,7 +13,7 @@ from backend.zudent_api import ZudentClient
 from backend.browser_scraper import ZudentBrowserScraper
 
 app = FastAPI(
-    title="Zudent Attendance Analyzer",
+    title="Qudent Attendance Analyzer",
     description="Automated Attendance Analyzer and Percentage Calculator for Zudent RoveLabs",
     version="1.0.0"
 )
