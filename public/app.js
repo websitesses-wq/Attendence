@@ -280,12 +280,12 @@ function renderAttendanceData(data, target) {
   const courses = data.courses || [];
 
   // Profile Info
-  studentName.textContent = profile.name || 'Student';
-  studentAvatar.textContent = (profile.name || 'S').charAt(0).toUpperCase();
-  studentUsn.textContent = profile.usn || 'N/A';
-  studentInstitution.textContent = profile.institution || 'RoveLabs Institution';
-  studentProgram.textContent = profile.program || 'Engineering';
-  studentTerm.textContent = `Term ${profile.current_term || 1}`;
+  if (studentName) studentName.textContent = profile.name || 'Student';
+  if (studentAvatar) studentAvatar.textContent = (profile.name || 'S').charAt(0).toUpperCase();
+  if (studentUsn) studentUsn.textContent = profile.usn || 'N/A';
+  if (studentInstitution) studentInstitution.textContent = profile.institution || 'RoveLabs Institution';
+  if (studentProgram) studentProgram.textContent = profile.program || 'Engineering';
+  if (studentTerm) studentTerm.textContent = `Term ${profile.current_term || 1}`;
 
   // Overall Attendance KPI
   const totalAtt = summary.total_attended || 0;
@@ -420,40 +420,48 @@ function renderMobileCards(courses, target) {
 
   courses.forEach(c => {
     const card = document.createElement('div');
-    card.className = 'course-mobile-card bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-sm space-y-2.5';
+    card.className = 'course-mobile-card bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-sm space-y-2.5';
 
     const pct = c.exact_percentage ?? 0.0;
     const targetInfo = calcMetrics(c.classes_attended || 0, c.classes_held || 0, target);
 
     const statusInfo = getAttendanceStatus(pct, target);
-    const statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusInfo.badgeClass} border">${statusInfo.shortLabel}</span>`;
+    const statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${statusInfo.badgeClass} border">${statusInfo.shortLabel}</span>`;
     const pctColor = statusInfo.textClass;
     const progressBg = statusInfo.barClass;
 
-    let adviceHtml = '';
+    let adviceBoxHtml = '';
     if (c.classes_held === 0) {
-      adviceHtml = '<span class="text-[11px] text-slate-400 italic">No classes held</span>';
+      adviceBoxHtml = `<div class="p-2 rounded-xl bg-slate-50 border border-slate-200 text-center text-[11px] text-slate-400 italic">No classes held yet</div>`;
     } else if (targetInfo.achieved) {
-      adviceHtml = `<span class="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
-        <i class="fa-solid fa-circle-check text-emerald-500"></i>
-        <span>Can bunk <strong>${targetInfo.bunks_allowed}</strong> class(es)</span>
-      </span>`;
+      adviceBoxHtml = `<div class="p-2 rounded-xl bg-emerald-50/70 border border-emerald-200/60 flex items-center justify-between text-xs">
+        <span class="text-[10.5px] font-medium text-emerald-800">Target ${target}%:</span>
+        <span class="font-bold text-emerald-700 flex items-center gap-1">
+          <i class="fa-solid fa-circle-check text-emerald-500"></i>
+          <span>Can bunk <strong>${targetInfo.bunks_allowed}</strong> class(es)</span>
+        </span>
+      </div>`;
     } else {
-      adviceHtml = `<span class="text-[11px] text-rose-700 font-semibold flex items-center gap-1">
-        <i class="fa-solid fa-triangle-exclamation text-rose-500"></i>
-        <span>Must attend <strong>${targetInfo.classes_needed}</strong> class(es)</span>
-      </span>`;
+      adviceBoxHtml = `<div class="p-2 rounded-xl bg-rose-50/70 border border-rose-200/60 flex items-center justify-between text-xs">
+        <span class="text-[10.5px] font-medium text-rose-800">Target ${target}%:</span>
+        <span class="font-bold text-rose-700 flex items-center gap-1">
+          <i class="fa-solid fa-triangle-exclamation text-rose-500"></i>
+          <span>Must attend <strong>${targetInfo.classes_needed}</strong> class(es)</span>
+        </span>
+      </div>`;
     }
 
     const typeIcon = (c.course_type || '').toLowerCase() === 'lab' 
       ? '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-700 uppercase">Lab</span>'
       : '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-700 uppercase">Theory</span>';
 
+    const missed = Math.max(0, (c.classes_held || 0) - (c.classes_attended || 0));
+
     card.innerHTML = `
       <div class="flex items-start justify-between gap-2">
         <div class="min-w-0 flex-1">
-          <div class="font-bold text-slate-900 text-xs sm:text-sm leading-snug line-clamp-2">${escapeHtml(c.course_name || c.course_code)}</div>
-          <div class="text-[10px] text-slate-400 font-mono mt-0.5 truncate">${escapeHtml(c.course_code)} &bull; ${escapeHtml(c.faculty_name || 'N/A')}</div>
+          <h4 class="font-bold text-slate-900 text-xs sm:text-sm leading-snug line-clamp-2">${escapeHtml(c.course_name || c.course_code)}</h4>
+          <div class="text-[10.5px] text-slate-400 font-mono mt-0.5 truncate">${escapeHtml(c.course_code)} &bull; ${escapeHtml(c.faculty_name || 'N/A')}</div>
         </div>
         <div class="flex items-center gap-1 flex-shrink-0">
           ${typeIcon}
@@ -461,17 +469,19 @@ function renderMobileCards(courses, target) {
         </div>
       </div>
 
-      <div class="flex items-center justify-between pt-1">
-        <div class="inline-flex items-center gap-1.5 font-mono text-xs bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
-          <span class="text-slate-500 text-[10px]">Attended:</span>
-          <span class="font-bold text-blue-600">${c.classes_attended}</span>
-          <span class="text-slate-400">/</span>
-          <span class="font-bold text-slate-700">${c.classes_held}</span>
+      <div class="flex items-end justify-between pt-0.5">
+        <div>
+          <span class="text-[9.5px] uppercase font-bold text-slate-400 tracking-wider block mb-0.5">Classes (Attended / Held)</span>
+          <div class="inline-flex items-center gap-1 font-mono text-xs font-bold bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
+            <span class="text-blue-600">${c.classes_attended}</span>
+            <span class="text-slate-400">/</span>
+            <span class="font-bold text-slate-700">${c.classes_held}</span>
+            <span class="text-[10px] text-slate-400 font-normal ml-0.5">(${missed} missed)</span>
+          </div>
         </div>
 
-        <div class="text-right flex items-baseline gap-1">
-          <span class="text-[10px] text-slate-400">Pct:</span>
-          <span class="font-extrabold text-base ${pctColor}">${pct.toFixed(2)}%</span>
+        <div class="text-right">
+          <div class="font-black text-xl ${pctColor}">${pct.toFixed(2)}%</div>
         </div>
       </div>
 
@@ -479,10 +489,7 @@ function renderMobileCards(courses, target) {
         <div class="h-1.5 rounded-full ${progressBg} transition-all duration-300" style="width: ${Math.min(100, pct)}%"></div>
       </div>
 
-      <div class="pt-1.5 border-t border-slate-100 flex items-center justify-between text-xs">
-        <span class="text-[10px] text-slate-400">Target ${target}% Advice:</span>
-        <div>${adviceHtml}</div>
-      </div>
+      ${adviceBoxHtml}
     `;
 
     mobileCoursesBody.appendChild(card);
