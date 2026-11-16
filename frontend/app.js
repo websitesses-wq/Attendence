@@ -98,7 +98,13 @@ form.addEventListener('submit', async (e) => {
       body: JSON.stringify({ email, password, mode, target })
     });
 
-    const result = await response.json();
+    let result;
+    const rawText = await response.text();
+    try {
+      result = JSON.parse(rawText);
+    } catch (parseErr) {
+      throw new Error(`Server response error (${response.status}): ${rawText.substring(0, 150) || 'Invalid server response'}`);
+    }
 
     if (!response.ok || !result.success) {
       const err = result.detail || result.message || 'Failed to fetch attendance.';
