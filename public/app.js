@@ -158,6 +158,7 @@ targetPercentSelect.addEventListener('change', () => {
   const newTarget = parseFloat(targetPercentSelect.value) || 85.0;
   if (currentAttendanceData) {
     renderAttendanceData(currentAttendanceData, newTarget);
+    alignAttendedToTarget();
     updateSimulator();
   }
 });
@@ -517,7 +518,47 @@ courseSearchInput.addEventListener('input', (e) => {
   }
 });
 
+// ── Align 'Classes to Attend' to Match Selected Target Percentage ──────────────
+function alignAttendedToTarget() {
+  if (!currentAttendanceData || !simUpcomingHeld || !simUpcomingAttended) return;
+
+  const target = parseFloat(targetPercentSelect.value) || 85.0;
+  const selVal = simCourseSelect.value;
+  const upcomingHeld = parseInt(simUpcomingHeld.value) || 1;
+
+  // Keep slider bounds synchronized
+  simUpcomingAttended.max = upcomingHeld;
+
+  let currentAtt = 0;
+  let currentHeld = 0;
+
+  if (selVal === 'overall') {
+    currentAtt = currentAttendanceData.overall_summary.total_attended || 0;
+    currentHeld = currentAttendanceData.overall_summary.total_held || 0;
+  } else {
+    const c = currentAttendanceData.courses[parseInt(selVal)];
+    if (c) {
+      currentAtt = c.classes_attended || 0;
+      currentHeld = c.classes_held || 0;
+    }
+  }
+
+  // Minimum required classes to attend out of upcoming to reach/maintain target:
+  // (currentAtt + A) / (currentHeld + upcomingHeld) >= t
+  const t = target / 100.0;
+  const totalFutureHeld = currentHeld + upcomingHeld;
+  let needed = Math.ceil(t * totalFutureHeld - currentAtt);
+
+  // Clamp within bounds [0, upcomingHeld]
+  if (needed < 0) needed = 0;
+  if (needed > upcomingHeld) needed = upcomingHeld;
+
+  simUpcomingAttended.value = needed;
+}
+
 // ── Simulator Initializer ─────────────────────────────────────────────────────
+let simListenersAttached = false;
+
 function initSimulator(courses, summary, target) {
   simCourseSelect.innerHTML = '<option value="overall">Overall (All Subjects Combined)</option>';
   courses.forEach((c, idx) => {
@@ -527,17 +568,31 @@ function initSimulator(courses, summary, target) {
     simCourseSelect.appendChild(opt);
   });
 
-  simUpcomingHeld.addEventListener('input', () => {
-    simUpcomingAttended.max = simUpcomingHeld.value;
-    if (parseInt(simUpcomingAttended.value) > parseInt(simUpcomingHeld.value)) {
-      simUpcomingAttended.value = simUpcomingHeld.value;
-    }
-    updateSimulator();
-  });
+  if (!simListenersAttached) {
+    // When moving Upcoming Classes slider:
+    // Automatically calculate and align the classes you will attend to match the selected target percentage!
+    simUpcomingHeld.addEventListener('input', () => {
+      alignAttendedToTarget();
+      updateSimulator();
+    });
 
-  simUpcomingAttended.addEventListener('input', updateSimulator);
-  simCourseSelect.addEventListener('change', updateSimulator);
+    // When moving 'Classes You Will Attend' slider manually:
+    // Upcoming classes STAY THE SAME; only recalculate the projection!
+    simUpcomingAttended.addEventListener('input', () => {
+      updateSimulator();
+    });
 
+    // When changing selected course:
+    // Align to match the target percentage for that course!
+    simCourseSelect.addEventListener('change', () => {
+      alignAttendedToTarget();
+      updateSimulator();
+    });
+
+    simListenersAttached = true;
+  }
+
+  alignAttendedToTarget();
   updateSimulator();
 }
 
@@ -546,8 +601,13 @@ function updateSimulator() {
 
   const target = parseFloat(targetPercentSelect.value) || 85.0;
   const selVal = simCourseSelect.value;
-  const upcomingHeld = parseInt(simUpcomingHeld.value);
-  const upcomingAtt = parseInt(simUpcomingAttended.value);
+  const upcomingHeld = parseInt(simUpcomingHeld.value) || 1;
+  
+  simUpcomingAttended.max = upcomingHeld;
+  if (parseInt(simUpcomingAttended.value) > upcomingHeld) {
+    simUpcomingAttended.value = upcomingHeld;
+  }
+  const upcomingAtt = parseInt(simUpcomingAttended.value) || 0;
 
   simHeldVal.textContent = `${upcomingHeld} classes`;
   simAttVal.textContent = `${upcomingAtt} classes`;
