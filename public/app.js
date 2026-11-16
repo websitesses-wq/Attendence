@@ -58,6 +58,7 @@ const bunkAdviceMessage = document.getElementById('bunkAdviceMessage');
 const riskCount = document.getElementById('riskCount');
 const totalCoursesBadge = document.getElementById('totalCoursesBadge');
 const coursesTableBody = document.getElementById('coursesTableBody');
+const mobileCoursesBody = document.getElementById('mobileCoursesBody');
 const courseSearchInput = document.getElementById('courseSearchInput');
 
 // Simulator Elements
@@ -71,6 +72,58 @@ const simProjectedPct = document.getElementById('simProjectedPct');
 const simChangePct = document.getElementById('simChangePct');
 const simStatusPill = document.getElementById('simStatusPill');
 const simAdviceText = document.getElementById('simAdviceText');
+
+// ── Mathematical Metric Calculation (Client-Side Instant Engine) ──────────────
+function calcMetrics(attended, held, target) {
+  if (held === 0) {
+    return {
+      status: "No Classes",
+      status_color: "gray",
+      target_percent: target,
+      achieved: false,
+      bunks_allowed: 0,
+      classes_needed: 0,
+      message: "No classes conducted yet."
+    };
+  }
+
+  const curr = (attended / held) * 100;
+  const t = target / 100.0;
+
+  if (curr >= target) {
+    const bunks = t > 0 ? Math.max(0, Math.floor((attended - t * held) / t)) : 0;
+    return {
+      status: curr >= 85 ? "Healthy" : "Moderate",
+      status_color: curr >= 85 ? "emerald" : "amber",
+      target_percent: target,
+      achieved: true,
+      bunks_allowed: bunks,
+      classes_needed: 0,
+      message: `Safe! You can miss ${bunks} more class(es) and remain above ${target}%.`
+    };
+  } else {
+    const need = t < 1.0 ? Math.ceil(((t * held) - attended) / (1.0 - t)) : 9999;
+    const classesNeeded = Math.max(1, need);
+    return {
+      status: "Critical",
+      status_color: "rose",
+      target_percent: target,
+      achieved: false,
+      bunks_allowed: 0,
+      classes_needed: classesNeeded,
+      message: `Attend ${classesNeeded} consecutive class(es) without missing to reach ${target}%.`
+    };
+  }
+}
+
+// ── Live Target Change: Automatically recalculate without re-fetching ─────────
+targetPercentSelect.addEventListener('change', () => {
+  const newTarget = parseFloat(targetPercentSelect.value) || 85.0;
+  if (currentAttendanceData) {
+    renderAttendanceData(currentAttendanceData, newTarget);
+    updateSimulator();
+  }
+});
 
 // Toggle Password Visibility
 togglePasswordBtn.addEventListener('click', () => {
@@ -98,7 +151,7 @@ form.addEventListener('submit', async (e) => {
   e.preventDefault();
   const email = emailInput.value.trim();
   const password = passwordInput.value;
-  const target = parseFloat(targetPercentSelect.value);
+  const target = parseFloat(targetPercentSelect.value) || 85.0;
   const mode = document.querySelector('input[name="fetchMode"]:checked').value;
 
   if (!email || !password) return;
@@ -189,7 +242,7 @@ function renderAttendanceData(data, target) {
   const summary = data.overall_summary || {};
   const courses = data.courses || [];
 
-  // Profile
+  // Profile Info
   studentName.textContent = profile.name || 'Student';
   studentAvatar.textContent = (profile.name || 'S').charAt(0).toUpperCase();
   studentUsn.textContent = profile.usn || 'N/A';
@@ -197,60 +250,63 @@ function renderAttendanceData(data, target) {
   studentProgram.textContent = profile.program || 'Engineering';
   studentTerm.textContent = `Term ${profile.current_term || 1}`;
 
-  // Summary KPIs
-  const overallPct = summary.overall_percentage || 0.0;
+  // Overall Attendance KPI
+  const totalAtt = summary.total_attended || 0;
+  const totalHeld = summary.total_held || 0;
+  const overallPct = totalHeld > 0 ? (totalAtt / totalHeld * 100) : 0.0;
+  
   overallPercentage.textContent = `${overallPct.toFixed(2)}%`;
   overallProgressBar.style.width = `${Math.min(100, overallPct)}%`;
-  overallFractionText.textContent = `Attended ${summary.total_attended || 0} of ${summary.total_held || 0} classes`;
+  overallFractionText.textContent = `Attended ${totalAtt} of ${totalHeld} classes`;
 
-  // Status Badge
-  overallStatusBadge.className = 'px-2.5 py-0.5 text-xs font-bold rounded-full';
+  // Status Badge for Overall
+  overallStatusBadge.className = 'px-2 py-0.5 text-[10px] sm:text-xs font-bold rounded-full';
   if (overallPct >= 85) {
     overallStatusBadge.classList.add('bg-emerald-100', 'text-emerald-800');
     overallStatusBadge.textContent = 'Healthy (≥85%)';
-    overallProgressBar.className = 'h-2 rounded-full bg-emerald-500 transition-all duration-500';
+    overallProgressBar.className = 'h-1.5 rounded-full bg-emerald-500 transition-all duration-500';
   } else if (overallPct >= 75) {
     overallStatusBadge.classList.add('bg-amber-100', 'text-amber-800');
     overallStatusBadge.textContent = 'Moderate (75-84%)';
-    overallProgressBar.className = 'h-2 rounded-full bg-amber-500 transition-all duration-500';
+    overallProgressBar.className = 'h-1.5 rounded-full bg-amber-500 transition-all duration-500';
   } else {
     overallStatusBadge.classList.add('bg-rose-100', 'text-rose-800');
     overallStatusBadge.textContent = 'Critical (<75%)';
-    overallProgressBar.className = 'h-2 rounded-full bg-rose-500 transition-all duration-500';
+    overallProgressBar.className = 'h-1.5 rounded-full bg-rose-500 transition-all duration-500';
   }
 
-  // Classes numbers
-  totalAttendedCount.textContent = summary.total_attended || 0;
-  totalHeldCount.textContent = summary.total_held || 0;
-  totalMissedText.textContent = `Missed: ${summary.total_missed || 0} classes total`;
+  // Classes Numbers
+  totalAttendedCount.textContent = totalAtt;
+  totalHeldCount.textContent = totalHeld;
+  totalMissedText.textContent = `Missed: ${Math.max(0, totalHeld - totalAtt)} total`;
 
-  // Target metrics for overall
-  const targetKey = String(target) in (summary.metrics?.targets || {}) ? String(target) : 'custom';
-  const overallTargetInfo = summary.metrics?.targets?.[targetKey] || summary.metrics?.targets?.['75'] || {};
-  
+  // Dynamic Bunk / Advice for Overall (Instant Recomputation)
+  const overallTargetInfo = calcMetrics(totalAtt, totalHeld, target);
   if (overallTargetInfo.achieved) {
-    bunkAllowedCount.textContent = overallTargetInfo.bunks_allowed ?? 0;
-    bunkAllowedCount.className = 'text-4xl font-extrabold text-emerald-600';
-    bunkAdviceMessage.innerHTML = `<span class="text-emerald-700 font-semibold">Safe!</span> You can miss up to <strong>${overallTargetInfo.bunks_allowed}</strong> class(es) overall and remain above ${target}%.`;
+    bunkAllowedCount.textContent = overallTargetInfo.bunks_allowed;
+    bunkAllowedCount.className = 'text-2xl sm:text-4xl font-extrabold text-emerald-600';
+    bunkAdviceMessage.innerHTML = `<span class="text-emerald-700 font-semibold">Safe!</span> Can miss <strong>${overallTargetInfo.bunks_allowed}</strong> class(es) above ${target}%.`;
   } else {
-    bunkAllowedCount.textContent = overallTargetInfo.classes_needed ?? 0;
-    bunkAllowedCount.className = 'text-4xl font-extrabold text-rose-600';
-    bunkAdviceMessage.innerHTML = `<span class="text-rose-700 font-semibold">Attention!</span> You must attend <strong>${overallTargetInfo.classes_needed}</strong> consecutive classes without missing to reach ${target}%.`;
+    bunkAllowedCount.textContent = overallTargetInfo.classes_needed;
+    bunkAllowedCount.className = 'text-2xl sm:text-4xl font-extrabold text-rose-600';
+    bunkAdviceMessage.innerHTML = `<span class="text-rose-700 font-semibold">Need:</span> Attend <strong>${overallTargetInfo.classes_needed}</strong> classes for ${target}%.`;
   }
 
-  // Risk count
-  const atRisk = courses.filter(c => c.exact_percentage < target && c.classes_held > 0).length;
+  // Dynamic Risk Count for Chosen Target
+  const atRisk = courses.filter(c => (c.exact_percentage ?? 0) < target && (c.classes_held ?? 0) > 0).length;
   riskCount.textContent = atRisk;
-  riskCount.className = atRisk > 0 ? 'text-4xl font-extrabold text-rose-600' : 'text-4xl font-extrabold text-emerald-600';
+  riskCount.className = atRisk > 0 ? 'text-2xl sm:text-4xl font-extrabold text-rose-600' : 'text-2xl sm:text-4xl font-extrabold text-emerald-600';
   totalCoursesBadge.textContent = `Total: ${courses.length} Courses`;
 
-  // Render Courses Table
+  // Render Both Desktop Table & Mobile Cards
   renderCoursesTable(courses, target);
+  renderMobileCards(courses, target);
 
   // Initialize Simulator Dropdown
   initSimulator(courses, summary, target);
 }
 
+// ── Desktop Table View ────────────────────────────────────────────────────────
 function renderCoursesTable(courses, target) {
   coursesTableBody.innerHTML = '';
 
@@ -264,34 +320,29 @@ function renderCoursesTable(courses, target) {
     tr.className = 'hover:bg-slate-50/80 transition-colors';
 
     const pct = c.exact_percentage ?? 0.0;
-    const isHealthy = pct >= 85;
-    const isSafe = pct >= 75;
+    const targetInfo = calcMetrics(c.classes_attended || 0, c.classes_held || 0, target);
 
     let statusBadge = '';
     let pctColor = 'text-slate-900';
     let progressBg = 'bg-slate-200';
 
     if (pct >= 85) {
-      statusBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">Healthy</span>`;
+      statusBadge = `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">Healthy</span>`;
       pctColor = 'text-emerald-600';
       progressBg = 'bg-emerald-500';
     } else if (pct >= 75) {
-      statusBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">Moderate</span>`;
+      statusBadge = `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">Moderate</span>`;
       pctColor = 'text-amber-600';
       progressBg = 'bg-amber-500';
     } else {
-      statusBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 border border-rose-200">Critical</span>`;
+      statusBadge = `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 border border-rose-200">Critical</span>`;
       pctColor = 'text-rose-600';
       progressBg = 'bg-rose-500';
     }
 
-    // Target advice
-    const targetKey = String(target) in (c.metrics?.targets || {}) ? String(target) : 'custom';
-    const targetInfo = c.metrics?.targets?.[targetKey] || c.metrics?.targets?.['75'] || {};
     let adviceHtml = '';
-
     if (c.classes_held === 0) {
-      adviceHtml = '<span class="text-xs text-slate-400 italic">No classes conducted</span>';
+      adviceHtml = '<span class="text-xs text-slate-400 italic">No classes held</span>';
     } else if (targetInfo.achieved) {
       adviceHtml = `<div class="text-xs text-emerald-700 font-medium flex items-center space-x-1.5">
         <i class="fa-solid fa-circle-check text-emerald-500"></i>
@@ -309,33 +360,33 @@ function renderCoursesTable(courses, target) {
       : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 uppercase">Theory</span>';
 
     tr.innerHTML = `
-      <td class="py-4 px-6">
+      <td class="py-3 px-5">
         <div class="font-bold text-slate-900">${escapeHtml(c.course_name || c.course_code)}</div>
         <div class="text-xs text-slate-400 font-mono mt-0.5">${escapeHtml(c.course_code)}</div>
       </td>
-      <td class="py-4 px-4 text-xs text-slate-600 font-medium">
+      <td class="py-3 px-3 text-xs text-slate-600 font-medium">
         ${escapeHtml(c.faculty_name || 'N/A')}
       </td>
-      <td class="py-4 px-4 text-center">
+      <td class="py-3 px-3 text-center">
         ${typeIcon}
       </td>
-      <td class="py-4 px-6 text-center">
-        <div class="inline-flex items-center space-x-1.5 font-mono text-sm bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">
+      <td class="py-3 px-4 text-center">
+        <div class="inline-flex items-center space-x-1.5 font-mono text-sm bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
           <span class="font-bold text-blue-600">${c.classes_attended}</span>
           <span class="text-slate-400">/</span>
           <span class="font-bold text-slate-700">${c.classes_held}</span>
         </div>
       </td>
-      <td class="py-4 px-6 text-right">
+      <td class="py-3 px-4 text-right">
         <div class="font-extrabold text-base ${pctColor}">${pct.toFixed(2)}%</div>
         <div class="w-20 bg-slate-100 rounded-full h-1.5 ml-auto mt-1 overflow-hidden">
           <div class="h-1.5 rounded-full ${progressBg}" style="width: ${Math.min(100, pct)}%"></div>
         </div>
       </td>
-      <td class="py-4 px-6 text-center">
+      <td class="py-3 px-4 text-center">
         ${statusBadge}
       </td>
-      <td class="py-4 px-6">
+      <td class="py-3 px-5">
         ${adviceHtml}
       </td>
     `;
@@ -343,17 +394,122 @@ function renderCoursesTable(courses, target) {
   });
 }
 
-// Course Filter Search
+// ── Mobile Cards View (Phones & Small Screens) ───────────────────────────────
+function renderMobileCards(courses, target) {
+  if (!mobileCoursesBody) return;
+  mobileCoursesBody.innerHTML = '';
+
+  if (courses.length === 0) {
+    mobileCoursesBody.innerHTML = `<div class="py-6 text-center text-slate-400 text-xs">No course attendance records found.</div>`;
+    return;
+  }
+
+  courses.forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'course-mobile-card bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-sm space-y-2.5';
+
+    const pct = c.exact_percentage ?? 0.0;
+    const targetInfo = calcMetrics(c.classes_attended || 0, c.classes_held || 0, target);
+
+    let statusBadge = '';
+    let pctColor = 'text-slate-900';
+    let progressBg = 'bg-slate-200';
+
+    if (pct >= 85) {
+      statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">Healthy</span>`;
+      pctColor = 'text-emerald-600';
+      progressBg = 'bg-emerald-500';
+    } else if (pct >= 75) {
+      statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">Moderate</span>`;
+      pctColor = 'text-amber-600';
+      progressBg = 'bg-amber-500';
+    } else {
+      statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-100 text-rose-800 border border-rose-200">Critical</span>`;
+      pctColor = 'text-rose-600';
+      progressBg = 'bg-rose-500';
+    }
+
+    let adviceHtml = '';
+    if (c.classes_held === 0) {
+      adviceHtml = '<span class="text-[11px] text-slate-400 italic">No classes held</span>';
+    } else if (targetInfo.achieved) {
+      adviceHtml = `<span class="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
+        <i class="fa-solid fa-circle-check text-emerald-500"></i>
+        <span>Can bunk <strong>${targetInfo.bunks_allowed}</strong> class(es)</span>
+      </span>`;
+    } else {
+      adviceHtml = `<span class="text-[11px] text-rose-700 font-semibold flex items-center gap-1">
+        <i class="fa-solid fa-triangle-exclamation text-rose-500"></i>
+        <span>Must attend <strong>${targetInfo.classes_needed}</strong> class(es)</span>
+      </span>`;
+    }
+
+    const typeIcon = (c.course_type || '').toLowerCase() === 'lab' 
+      ? '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-700 uppercase">Lab</span>'
+      : '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-700 uppercase">Theory</span>';
+
+    card.innerHTML = `
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0 flex-1">
+          <div class="font-bold text-slate-900 text-xs sm:text-sm leading-snug line-clamp-2">${escapeHtml(c.course_name || c.course_code)}</div>
+          <div class="text-[10px] text-slate-400 font-mono mt-0.5 truncate">${escapeHtml(c.course_code)} &bull; ${escapeHtml(c.faculty_name || 'N/A')}</div>
+        </div>
+        <div class="flex items-center gap-1 flex-shrink-0">
+          ${typeIcon}
+          ${statusBadge}
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between pt-1">
+        <div class="inline-flex items-center gap-1.5 font-mono text-xs bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
+          <span class="text-slate-500 text-[10px]">Attended:</span>
+          <span class="font-bold text-blue-600">${c.classes_attended}</span>
+          <span class="text-slate-400">/</span>
+          <span class="font-bold text-slate-700">${c.classes_held}</span>
+        </div>
+
+        <div class="text-right flex items-baseline gap-1">
+          <span class="text-[10px] text-slate-400">Pct:</span>
+          <span class="font-extrabold text-base ${pctColor}">${pct.toFixed(2)}%</span>
+        </div>
+      </div>
+
+      <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+        <div class="h-1.5 rounded-full ${progressBg} transition-all duration-300" style="width: ${Math.min(100, pct)}%"></div>
+      </div>
+
+      <div class="pt-1.5 border-t border-slate-100 flex items-center justify-between text-xs">
+        <span class="text-[10px] text-slate-400">Target ${target}% Advice:</span>
+        <div>${adviceHtml}</div>
+      </div>
+    `;
+
+    mobileCoursesBody.appendChild(card);
+  });
+}
+
+// ── Course Search / Filter (Filters both desktop table & mobile cards) ───────
 courseSearchInput.addEventListener('input', (e) => {
   const query = e.target.value.toLowerCase().trim();
+
+  // Desktop table filter
   const rows = coursesTableBody.querySelectorAll('tr');
   rows.forEach(row => {
     const text = row.innerText.toLowerCase();
     row.style.display = text.includes(query) ? '' : 'none';
   });
+
+  // Mobile cards filter
+  if (mobileCoursesBody) {
+    const cards = mobileCoursesBody.querySelectorAll('.course-mobile-card');
+    cards.forEach(card => {
+      const text = card.innerText.toLowerCase();
+      card.style.display = text.includes(query) ? '' : 'none';
+    });
+  }
 });
 
-// Simulator Initializer
+// ── Simulator Initializer ─────────────────────────────────────────────────────
 function initSimulator(courses, summary, target) {
   simCourseSelect.innerHTML = '<option value="overall">Overall (All Subjects Combined)</option>';
   courses.forEach((c, idx) => {
@@ -380,7 +536,7 @@ function initSimulator(courses, summary, target) {
 function updateSimulator() {
   if (!currentAttendanceData) return;
 
-  const target = parseFloat(targetPercentSelect.value) || 75.0;
+  const target = parseFloat(targetPercentSelect.value) || 85.0;
   const selVal = simCourseSelect.value;
   const upcomingHeld = parseInt(simUpcomingHeld.value);
   const upcomingAtt = parseInt(simUpcomingAttended.value);
@@ -411,29 +567,31 @@ function updateSimulator() {
   simCurrentPct.textContent = `${currPct.toFixed(2)}%`;
   simProjectedPct.textContent = `${newPct.toFixed(2)}%`;
   simChangePct.textContent = `${diff >= 0 ? '+' : ''}${diff.toFixed(2)}%`;
-  simChangePct.className = diff >= 0 ? 'text-2xl font-bold text-emerald-400' : 'text-2xl font-bold text-rose-400';
+  simChangePct.className = diff >= 0 ? 'text-lg sm:text-2xl font-bold text-emerald-400' : 'text-lg sm:text-2xl font-bold text-rose-400';
 
   if (newPct >= 85) {
-    simStatusPill.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30';
+    simStatusPill.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30';
     simStatusPill.textContent = 'Healthy (≥85%)';
   } else if (newPct >= 75) {
-    simStatusPill.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30';
+    simStatusPill.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30';
     simStatusPill.textContent = 'Moderate (75-84%)';
   } else {
-    simStatusPill.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-400/30';
+    simStatusPill.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-400/30';
     simStatusPill.textContent = 'Critical (<75%)';
   }
 
   const courseLabel = selVal === 'overall' ? 'overall attendance' : 'attendance for this course';
   if (newPct >= target) {
-    simAdviceText.innerHTML = `If you attend <strong>${upcomingAtt}</strong> of the next <strong>${upcomingHeld}</strong> classes, your ${courseLabel} will be <strong>${newPct.toFixed(2)}%</strong>, safely meeting your target of ${target}%.`;
+    simAdviceText.innerHTML = `If you attend <strong>${upcomingAtt}</strong> of the next <strong>${upcomingHeld}</strong> classes, your ${courseLabel} will be <strong>${newPct.toFixed(2)}%</strong>, safely above your ${target}% target.`;
   } else {
-    simAdviceText.innerHTML = `Warning: Attending <strong>${upcomingAtt}</strong> of the next <strong>${upcomingHeld}</strong> classes will keep your ${courseLabel} at <strong>${newPct.toFixed(2)}%</strong>, which is <span class="text-rose-400 font-bold">below</span> your ${target}% target.`;
+    simAdviceText.innerHTML = `Warning: Attending <strong>${upcomingAtt}</strong> of the next <strong>${upcomingHeld}</strong> classes will result in <strong>${newPct.toFixed(2)}%</strong>, which is <span class="text-rose-400 font-bold">below</span> your ${target}% target.`;
   }
 }
 
-// Demo Data Generator
+// ── Demo Data Generator ───────────────────────────────────────────────────────
 function loadDemoData() {
+  const currentSelectedTarget = parseFloat(targetPercentSelect.value) || 85.0;
+
   const demoCourses = [
     {
       course_code: "21CS61",
@@ -442,13 +600,7 @@ function loadDemoData() {
       course_type: "theory",
       classes_attended: 28,
       classes_held: 32,
-      exact_percentage: 87.50,
-      metrics: {
-        targets: {
-          "75": { achieved: true, bunks_allowed: 5, classes_needed: 0 },
-          "85": { achieved: true, bunks_allowed: 0, classes_needed: 0 }
-        }
-      }
+      exact_percentage: 87.50
     },
     {
       course_code: "21CS62",
@@ -457,13 +609,7 @@ function loadDemoData() {
       course_type: "theory",
       classes_attended: 31,
       classes_held: 34,
-      exact_percentage: 91.18,
-      metrics: {
-        targets: {
-          "75": { achieved: true, bunks_allowed: 7, classes_needed: 0 },
-          "85": { achieved: true, bunks_allowed: 2, classes_needed: 0 }
-        }
-      }
+      exact_percentage: 91.18
     },
     {
       course_code: "21CS63",
@@ -472,13 +618,7 @@ function loadDemoData() {
       course_type: "theory",
       classes_attended: 22,
       classes_held: 30,
-      exact_percentage: 73.33,
-      metrics: {
-        targets: {
-          "75": { achieved: false, bunks_allowed: 0, classes_needed: 2 },
-          "85": { achieved: false, bunks_allowed: 0, classes_needed: 26 }
-        }
-      }
+      exact_percentage: 73.33
     },
     {
       course_code: "21CSL66",
@@ -487,13 +627,7 @@ function loadDemoData() {
       course_type: "lab",
       classes_attended: 14,
       classes_held: 14,
-      exact_percentage: 100.0,
-      metrics: {
-        targets: {
-          "75": { achieved: true, bunks_allowed: 4, classes_needed: 0 },
-          "85": { achieved: true, bunks_allowed: 2, classes_needed: 0 }
-        }
-      }
+      exact_percentage: 100.0
     },
     {
       course_code: "21CSL67",
@@ -502,13 +636,7 @@ function loadDemoData() {
       course_type: "lab",
       classes_attended: 11,
       classes_held: 13,
-      exact_percentage: 84.62,
-      metrics: {
-        targets: {
-          "75": { achieved: true, bunks_allowed: 1, classes_needed: 0 },
-          "85": { achieved: false, bunks_allowed: 0, classes_needed: 1 }
-        }
-      }
+      exact_percentage: 84.62
     }
   ];
 
@@ -534,18 +662,12 @@ function loadDemoData() {
       total_attended: totalAtt,
       total_held: totalHeld,
       total_missed: totalHeld - totalAtt,
-      overall_percentage: overallPct,
-      metrics: {
-        targets: {
-          "75": { achieved: true, bunks_allowed: 14, classes_needed: 0 },
-          "85": { achieved: true, bunks_allowed: 0, classes_needed: 0 }
-        }
-      }
+      overall_percentage: overallPct
     },
     courses: demoCourses
   };
 
-  renderAttendanceData(demoData, 75.0);
+  renderAttendanceData(demoData, currentSelectedTarget);
 }
 
 function escapeHtml(str) {
@@ -557,4 +679,3 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
-
